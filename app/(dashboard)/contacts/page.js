@@ -1,6 +1,4 @@
-// ========================
-// 📁 frontend/app/contacts/page.js
-// ========================
+
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -47,14 +45,23 @@ export default function ContactsPage() {
   });
 
   const allTags = useMemo(() => {
-    const tags = new Set();
-    contacts.forEach((c) => c.tags?.forEach((t) => tags.add(t)));
-    return Array.from(tags);
-  }, [contacts]);
+  const tags = new Set();
+  contacts?.forEach((c) => {
+    if (Array.isArray(c.tags)) {
+      c.tags.forEach((t) => t.split(',').map((tag) => tag.trim()).forEach((tag) => tags.add(tag)));
+    } else if (typeof c.tags === 'string') {
+      c.tags.split(',').forEach((tag) => tags.add(tag.trim()));
+    }
+  });
+  return Array.from(tags);
+}, [contacts]);
 
   const filtered = contacts
     .filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
-    .filter((c) => (tagFilter ? c.tags?.includes(tagFilter) : true));
+    .filter((c) => {
+      const tagList = Array.isArray(c.tags) ? c.tags.flatMap(t => t.split(',').map(tag => tag.trim())) : [];
+      return tagFilter ? tagList.includes(tagFilter) : true;
+    });
 
   const paginated = filtered.slice(page * limit, (page + 1) * limit);
 
@@ -65,18 +72,20 @@ export default function ContactsPage() {
   };
 
   const handleDeleteSelected = async () => {
-    const token = await getFirebaseIdToken();
-    await Promise.all(
-      selectedContacts.map((id) =>
-        fetch(`http://localhost:5000/api/contacts/${id}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        })
-      )
-    );
-    setSelectedContacts([]);
-    queryClient.invalidateQueries(['contacts']);
-  };
+  const token = await getFirebaseIdToken();
+
+  await fetch('http://localhost:5000/api/contacts/bulk-delete', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ ids: selectedContacts }),
+  });
+
+  setSelectedContacts([]);
+  queryClient.invalidateQueries(['contacts']);
+};
 
   return (
     <div className="p-6 space-y-4">
@@ -154,12 +163,12 @@ export default function ContactsPage() {
                 <TableCell>{c.email}</TableCell>
                 <TableCell>{c.company}</TableCell>
                 <TableCell>
-                  {c.tags?.map((t, i) => (
-                    <span key={i} className="inline-block bg-blue-100 text-blue-700 px-2 py-1 text-xs rounded mr-1">
-                      {t}
-                    </span>
-                  ))}
-                </TableCell>
+  {c.tags?.flatMap(tag => tag.split(',').map(t => t.trim())).map((t, i) => (
+    <span key={i} className="inline-block bg-blue-100 text-blue-700 px-2 py-1 text-xs rounded mr-1">
+      {t}
+    </span>
+  ))}
+</TableCell>
                 <TableCell>
                   <Button variant="ghost" size="sm" onClick={() => {
                     setEditingContact(c);
@@ -206,12 +215,12 @@ export default function ContactsPage() {
               <p className="text-sm text-gray-600">🏢 {c.company}</p>
               <p className="text-sm text-gray-600">📞 {c.phone}</p>
               <div className="flex flex-wrap gap-1 mt-2">
-                {c.tags?.map((t, i) => (
-                  <span key={i} className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
-                    {t}
-                  </span>
-                ))}
-              </div>
+  {c.tags?.flatMap(tag => tag.split(',').map(t => t.trim())).map((t, i) => (
+    <span key={i} className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">
+      {t}
+    </span>
+  ))}
+</div>
             </div>
           ))}
         </div>

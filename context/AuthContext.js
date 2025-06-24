@@ -1,6 +1,4 @@
-// ========================
-// 📁 frontend/context/AuthContext.js
-// ========================
+
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
@@ -17,8 +15,6 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // ✅ Keep Firebase auth state synced
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
@@ -37,8 +33,6 @@ export const AuthProvider = ({ children }) => {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
-
-    // ✅ Sync Firebase
     await signInWithEmailAndPassword(auth, email, password);
     setUser(data.user);
     setLoading(false);
