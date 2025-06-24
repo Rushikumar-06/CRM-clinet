@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
@@ -15,12 +14,35 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const fetchUserFromBackend = async (firebaseUser) => {
+    try {
+      const token = await firebaseUser.getIdToken();
+      const res = await fetch('http://localhost:5000/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUser(data.user);
+      } else {
+        setUser(null);
+      }
+    } catch (err) {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      setLoading(false);
+      if (firebaseUser) {
+        await fetchUserFromBackend(firebaseUser);
+      } else {
+        setUser(null);
+        setLoading(false);
+      }
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -32,10 +54,12 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ email, password, displayName }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    if (!res.ok) {
+      setLoading(false);
+      throw new Error(data.error || 'Registration failed');
+    }
     await signInWithEmailAndPassword(auth, email, password);
-    setUser(data.user);
-    setLoading(false);
+    await fetchUserFromBackend(auth.currentUser);
   };
 
   const login = async (email, password) => {
@@ -46,12 +70,12 @@ export const AuthProvider = ({ children }) => {
       body: JSON.stringify({ email, password }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-
-    // ✅ Sync Firebase client
+    if (!res.ok) {
+      setLoading(false);
+      throw new Error(data.error || 'Login failed');
+    }
     await signInWithEmailAndPassword(auth, email, password);
-    setUser(data.user);
-    setLoading(false);
+    await fetchUserFromBackend(auth.currentUser);
     return data.token;
   };
 
@@ -77,10 +101,8 @@ export const AuthProvider = ({ children }) => {
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setUser(data.user);
-      setLoading(false);
+      await fetchUserFromBackend(result.user);
     } catch (err) {
-      console.error('Google sign-in failed:', err);
       setLoading(false);
       throw err;
     }

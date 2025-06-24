@@ -1,21 +1,23 @@
-// === app/(dashboard)/layout.js ===
 'use client';
 
-import { useAuth } from '../../context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import Sidebar from '@/components/shared/Sidebar';
 import Topbar from '@/components/shared/Topbar';
 
 export default function DashboardLayout({ children }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (!user) {
-      router.replace('/login');
+    if (!loading && !user) {
+      router.replace(`/login?redirect=${pathname}`);
     }
-  }, [user]);
+  }, [user, loading, pathname, router]);
+
+ 
 
   if (!user) return null;
 
