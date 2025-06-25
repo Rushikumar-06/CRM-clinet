@@ -1,4 +1,4 @@
-// ✅ FRONTEND: app/tags/page.js
+// ✅ FRONTEND: app/(protected)/tags/page.js
 'use client';
 
 import { useState } from 'react';
@@ -6,10 +6,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getFirebaseIdToken } from '@/lib/firebaseAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Pencil, Trash2, Plus } from 'lucide-react';
 
 export default function TagsPage() {
   const [newTag, setNewTag] = useState('');
   const [newColor, setNewColor] = useState('#888888');
+  const [editingTag, setEditingTag] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editColor, setEditColor] = useState('#88888');
+
   const queryClient = useQueryClient();
 
   const { data: tags = [] } = useQuery({
@@ -50,64 +56,105 @@ export default function TagsPage() {
     queryClient.invalidateQueries(['available-tags']);
   };
 
-  const updateTag = async (id, updates) => {
+  const openEditDialog = (tag) => {
+    setEditingTag(tag);
+    setEditName(tag.name);
+    setEditColor(tag.color);
+  };
+
+  const saveEdit = async () => {
     const token = await getFirebaseIdToken();
-    await fetch(`http://localhost:5000/api/tags/${id}`, {
+    await fetch(`http://localhost:5000/api/tags/${editingTag._id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(updates),
+      body: JSON.stringify({ name: editName, color: editColor }),
     });
+    setEditingTag(null);
     queryClient.invalidateQueries(['tags']);
     queryClient.invalidateQueries(['available-tags']);
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <h2 className="text-3xl font-bold text-blue-800">Tags</h2>
-
-      <div className="flex gap-4 items-center bg-gray-50 p-4 rounded-lg shadow">
-        <Input
-          placeholder="New tag name"
-          value={newTag}
-          onChange={(e) => setNewTag(e.target.value)}
-          className="max-w-sm border border-blue-300"
-        />
-        <input
-          type="color"
-          value={newColor}
-          onChange={(e) => setNewColor(e.target.value)}
-          className="w-10 h-10 border rounded"
-        />
-        <Button onClick={addTag} className="bg-blue-600 hover:bg-blue-700 text-white">Add Tag</Button>
+    <div className="p-10 max-w-6xl mx-auto space-y-12">
+      <div className="grid sm:grid-cols-4 gap-6 bg-white border shadow-lg rounded-xl p-6 items-end">
+        <div className="col-span-2">
+          <label className="block text-sm font-semibold mb-1">Tag Name</label>
+          <Input
+            placeholder="e.g., Important, Client, Personal"
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col">
+          <label className="block text-sm font-semibold mb-1">Color</label>
+          <input
+            type="color"
+            value={newColor}
+            onChange={(e) => setNewColor(e.target.value)}
+            className="w-9 h-7  border-gray-300 shadow-sm cursor-pointer"
+          />
+        </div>
+        <Button className="h-12" onClick={addTag}>
+          <Plus size={16} className="mr-2" /> Add Tag
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {Array.isArray(tags) && tags.map((tag) => (
-          <div key={tag._id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-md flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className="w-4 h-4 rounded-full" style={{ backgroundColor: tag.color }} />
-              <Input
-                value={tag.name}
-                onChange={(e) => updateTag(tag._id, { name: e.target.value })}
-                className="text-sm w-32 border border-gray-300"
-              />
-              <input
-                type="color"
-                value={tag.color}
-                onChange={(e) => updateTag(tag._id, { color: e.target.value })}
-                className="w-8 h-8 border rounded"
-              />
-              <span className="text-xs text-gray-500">Used {tag.usageCount}x</span>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {tags.map((tag) => (
+          <div
+            key={tag._id}
+            className="rounded-2xl shadow-lg border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-6 flex flex-col gap-4 hover:shadow-xl transition"
+          >
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-6 h-6 rounded-full border"
+                  style={{ backgroundColor: tag.color }}
+                />
+                <span className="font-semibold text-lg text-gray-800">{tag.name}</span>
+              </div>
+              <span className="text-xs text-gray-500">{tag.usageCount} uses</span>
             </div>
-            <Button size="sm" variant="destructive" onClick={() => deleteTag(tag._id)}>
-              Delete
-            </Button>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="secondary" onClick={() => openEditDialog(tag)}>
+                <Pencil className="w-4 h-4 mr-1" /> Edit
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => deleteTag(tag._id)}>
+                <Trash2 className="w-4 h-4 mr-1" /> Delete
+              </Button>
+            </div>
           </div>
         ))}
       </div>
+
+      <Dialog open={!!editingTag} onOpenChange={() => setEditingTag(null)}>
+        <DialogContent className="space-y-4">
+          <h3 className="text-xl font-semibold">Edit Tag</h3>
+          <Input
+            placeholder="Tag Name"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+          />
+          <div className="flex items-center gap-4">
+            <label className="font-medium">Color:</label>
+            <input
+              type="color"
+              value={editColor}
+              onChange={(e) => setEditColor(e.target.value)}
+              className="w-9 h-7  border-gray-300 shadow-sm cursor-pointer"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setEditingTag(null)}>
+              Cancel
+            </Button>
+            <Button onClick={saveEdit}>Save Changes</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
